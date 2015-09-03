@@ -33,9 +33,12 @@ doadonis <- function(physeq, category) {
   
   # Homogeneity of dispersion test
   betatax = betadisper(bdist,col)
-  p = permutest(betatax)
+  disper.test = permutest(betatax)
   print("Betadisper results:")
-  print(p$tab)
+  print(disper.test$tab)
+
+  l <- list(dist=bdist, factor=col, adonis=adonis.bdist, disper=disper.test)
+  return (l)
 }
 
 
@@ -90,8 +93,7 @@ make_tax_barplot <- function(df, x, y, tax, facet, title, colors, xlab, ylab, re
       strip.background = element_rect(color = "white",size = 2, fill = NA),
       panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
       panel.border = element_rect(colour = "black", fill = NA, size = 1.5),
-      panel.margin = unit(1, "lines"),
-      panel.background = element_rect(fill = "#a8a8a8")
+      panel.margin = unit(1, "lines")
     ) +
     guides(fill = guide_legend(reverse = TRUE, keywidth = 1, keyheight = 1)) +
     xlab(xlab) +
@@ -116,7 +118,7 @@ make_tax_barplot <- function(df, x, y, tax, facet, title, colors, xlab, ylab, re
 # 2) Ordinates
 # 3) Plots ordination
 
-myord <- function(physeq, n,
+ord_wrapper <- function(physeq, n,
   method, distance, colors = NULL, 
   factor.color, factor.shape, title){
 
@@ -150,7 +152,7 @@ myordplot <- function (physeq, ordination, colors, factor.color, factor.shape, t
 
 ###### Merge functions ############
 
-#Merge samples by averaging OTU countsinstead of summing
+# Merge samples by averaging OTU counts instead of summing
 merge_samples_mean <- function(physeq, group){
   # Calculate the number of samples in each group
   group_sums <- as.matrix(table(sample_data(physeq)[ ,group]))[,1]
@@ -173,7 +175,7 @@ merge_samples_mean <- function(physeq, group){
 
 # Merge samples, just including OTUs that were present in all
 
-masa_merge <- function(physeq, group){
+merge_OTU_intersect <- function(physeq, group){
   
   # Make sure we're not starting with more taxa than we need 
   physeq <- prune_taxa(taxa_sums(physeq) > 0, physeq)

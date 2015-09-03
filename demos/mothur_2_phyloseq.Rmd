@@ -21,7 +21,6 @@ library(scales)
 library(grid)
 library(reshape2)
 library(phyloseq)
-packageVersion("phyloseq")
 ```
 
 ```{r}
@@ -214,5 +213,12 @@ adonis.station <- doadonis(physeq = moth_good, category = "Station")
 This output tells us that our adonis test is significant so we can reject he null hypothesis that
 Additionally, our betadisper results are nonsignificant, meaning we cannot reject the null hypothesis that our groups have different dispersions. This means we can be more confident that our adonis result is a real result, and not due to differences in group dispersions
 
+
+# Session info
+```{r}
+sessionInfo()
+
+
+```
 
 
