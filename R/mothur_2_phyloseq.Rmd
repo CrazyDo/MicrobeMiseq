@@ -1,0 +1,218 @@
+---
+title: "Mothur to Phyloseq Demo"
+output:
+  html_document:
+    toc: true
+    theme: united
+---
+This is a script to demonstrate how to import mothur files into R using phyloseq and run some basic analyses/ plots
+
+Author: Michelle Berry
+
+Date: September 3rd, 2015
+
+# Libraries
+```{r load libraries, warning = FALSE, message = FALSE}
+#Load libraries
+library(ggplot2)
+library(vegan)
+library(plyr)
+library(scales)
+library(grid)
+library(reshape2)
+library(phyloseq)
+packageVersion("phyloseq")
+```
+
+```{r}
+# Set working directory
+setwd("~/chabs/miseq_may2015/analysis/")
+
+# Source code files
+# miseqR.R can be found in this repository
+# habs_functions.R are formatting functions specific to this dataset
+source("miseqR.R")
+source("habs_functions.R")
+```
+
+# Data import
+
+here we import the mothur shared file, consensus taxonomy file, 
+and our sample metadata and store them in one phyloseq object
+```{r mothur import}
+
+# Import mothur files and sample metadata
+sharedfile = "mothur/allhabs.shared"
+taxfile = "mothur/allhabs.taxonomy"
+mapfile = "other/habs_metadata.csv"
+ 
+mothurdata = import_mothur(mothur_shared_file = sharedfile,
+  mothur_constaxonomy_file = taxfile)
+
+# Import sample metadata
+map <- read.csv(mapfile)
+map <- sample_data(map)
+rownames(map) <- map$SampleID
+  
+# Merge mothurdata object with sample metadata
+moth_merge = merge_phyloseq(mothurdata, map)
+moth_merge
+```
+Now we have a phyloseq object called moth_merge. 
+
+Before we move on with analysis, we need to do some basic reformatting and filtering 
+```{r}
+#  I like to add the OTU number as a column in the taxonomy file
+tax_table(moth_merge) <- cbind(tax_table(moth_merge), 
+  row.names(tax_table(moth_merge)))
+
+colnames(tax_table(moth_merge))
+# These taxonomy names are not helpful, so let's rename them
+colnames(tax_table(moth_merge)) <- c("Kingdom", "Phylum", "Class",
+  "Order", "Family", "Genus", "Species")
+  
+# Filter out non-samples (i.e. water, mock, blanks) 
+# Note, there is a column in my metadata named "Type"
+# Also prune out taxa which were only present in removed samples
+moth_good <- subset_samples(moth_merge,Type == "sample")
+moth_good <- prune_taxa(taxa_sums(moth_good) > 0, moth_good)
+
+# Filter out non-bacteria, chloroplasts and mitochondria 
+# You may have done this already in mothur, but it's good to check
+moth_good <- subset_taxa(moth_good, Kingdom == "Bacteria")
+moth_good <- subset_taxa(moth_good, Class != "Chloroplast")
+moth_good <- subset_taxa(moth_good, Family != "mitochondria")
+moth_good
+```
+
+# Sample summary
+
+First, we will look at the distribution of read counts from our samples
+
+
+A lot of the 100um samples have very low read counts because a majority 
+of the reads were chloroplasts. This is important to keep in mind for 
+beta diversity analyses, because to include all the samples we need 
+to really throw out a lot of data to normalize the sequencing depth.
+
+```{r}
+# Histogram of sample read counts
+theme_set(theme_bw())
+ggplot(data.frame(sum = sample_sums(moth_good)), aes(sum)) + 
+  geom_histogram(colour = "white", fill = "indianred") +
+  ggtitle("Sample read counts") + 
+  xlab("total sequences")
+
+# mean, max and min of sample read counts
+mins <- min(sample_sums(moth_good))
+means <- mean(sample_sums(moth_good))
+maxs <- max(sample_sums(moth_good))
+
+```
+The minimum sample read count is "mins"
+The mean sample read count is "means"
+The max sample read count is "maxs"
+
+
+# Stacked barplots
+
+Here we make a stacked barplot of phylum community composition 
+across filter fractions and sampling stations. 
+
+These utility functions are highly flexible and can be adapted to the variables
+in your own dataset
+```{r composition barplot, fig.height=10,fig.width=14}
+
+
+# Transform to long format and prune out phyla below 5% in each sample
+# for easier to read stacked barplot
+moth.long <- transform_and_melt(
+  physeq = moth_good,
+	taxrank = "Phylum",
+	prune = .05)
+
+# Special formatting for these samples
+moth.format <- habs_format(phy.long = moth.long)
+
+# Set phylum colors for plotting
+phylum.colors <- c(
+  "#CBD588", "#5F7FC7", "orange","#DA5724", "#89C5DA", "#508578", "#CD9BCD",
+  "#74D944", "#D7C1B1", "#AD6F3B", "#673770","#D14285","#689030",
+  "#6DDE88", "#652926", "#7FDCC0", "#C84248", "#8569D5", "#5E738F",
+  "#D1A33D", "#8A7C64", "#599861"
+)
+
+# Plot 
+make_tax_barplot(
+  df = moth.format, 
+  x = "Date", 
+  y = "Abundance",
+  tax = "Taxonomy",
+  facet = "Fraction~Station",
+  title = "",
+  colors = phylum.colors,
+  xlab = "",
+  ylab = "Relative Abundance\n",
+  outline = "black",
+  relative = TRUE,
+  guide = TRUE
+)
+
+
+```
+
+# Ordinations
+
+This is an example of how to make an ordination such as a Principle Coordintes Analysis. 
+More documentation on these function is available 
+```{r}
+# Subset to full community fraction (CNA), and apply special formatting
+CNA.format <- habs_ord_format(physeq = moth_good, fraction = "CNA")
+
+ord_wrapper(
+  physeq = CNA.format, 
+  n = min(sample_sums(CNA.format)),
+  method = "PCoA",
+  distance = "bray",
+  colors = c("#a65628","red","#ffae19","#4daf4a","#1919ff","darkorchid3","magenta"),
+  factor.color = "Month",
+  factor.shape = "Station",
+  title = "PCoA of Lake Erie bacterial Communities"
+)
+
+
+```
+
+Let's try an NMDS instead. For NMDS plots it's important to set a seed since the starting positions of samples in the alogrithm is random
+
+```{r}
+set.seed(1)
+ord_wrapper(
+  physeq = CNA.format, 
+  n = min(sample_sums(CNA.format)),
+  method = "NMDS",
+  distance = "bray",
+  colors = c("#a65628","red","#ffae19","#4daf4a","#1919ff","darkorchid3","magenta"),
+  factor.color = "Month",
+  factor.shape = "Station",
+  title = "NMDS of Lake Erie bacterial Communities"
+)
+```
+
+
+# Permanova
+
+Here is an example of how to run a permanova test using the adonis function in vegan.
+In this example we are testing the hypothesis that the three stations we collected samples
+from have different centroids 
+
+```{r}
+set.seed(1)
+adonis.station <- doadonis(physeq = moth_good, category = "Station")
+
+```
+This output tells us that our adonis test is significant so we can reject he null hypothesis that
+Additionally, our betadisper results are nonsignificant, meaning we cannot reject the null hypothesis that our groups have different dispersions. This means we can be more confident that our adonis result is a real result, and not due to differences in group dispersions
+
+
+
