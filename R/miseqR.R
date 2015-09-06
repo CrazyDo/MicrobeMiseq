@@ -4,156 +4,109 @@
 
 ##### Normalization #######
 
+# Better rounding function than R's base round
+matround <- function(x){trunc(x+0.5)}
+
+
 # Scales reads by 
-# 1) taking proportions,
+# 1) taking proportions
 # 2) multiplying by a given library size of n
-# 3) rounding down
-scale_reads <- function(physeq, n) {
-  physeq.scale <-
-    transform_sample_counts(physeq, function(x) {
-      (n * x/sum(x))
-    })
-  otu_table(physeq.scale) <- floor(otu_table(physeq.scale))
+# 3) rounding 
+# Default for n is the minimum sample size in your library
+# Default for round is floor
+scale_reads <- function(physeq, n = min(sample_sums(physeq)), round = "floor") {
+  
+  # transform counts to n
+  physeq.scale <- transform_sample_counts(physeq, 
+    function(x) {(n * x/sum(x))}
+  )
+  
+  # Pick the rounding functions
+  if (round == "floor"){
+    otu_table(physeq.scale) <- floor(otu_table(physeq.scale))
+  } else if (round == "round"){
+    otu_table(physeq.scale) <- matround(otu_table(physeq.scale))
+  }
+  
+  # Prune taxa and return new phyloseq object
   physeq.scale <- prune_taxa(taxa_sums(physeq.scale) > 0, physeq.scale)
   return(physeq.scale)
 }
 
+
 ##### ADONIS ###########
 
-# Function to run adonis test on a physeq object and a variable from metadata 
-doadonis <- function(physeq, category) {
-  physeq.scale <- scale_reads(physeq, min(sample_sums(physeq)))
-  bdist <- phyloseq::distance(physeq.scale, "bray")
-  col <- as(sample_data(physeq), "data.frame")[ ,category]
+# Function to run adonis test on a phyloseq object and a variable from metadata
+# Make sure OTU data is standardized/normalized before 
+phyloseq_to_adonis <- function(physeq, distmat = NULL, dist = "bray", formula) {
+  
+  if(!is.null(distmat)){
+    phydist <- distmat
+  } else {
+    phydist <- phyloseq::distance(physeq, dist)
+  }
+  
+  metadata <- as(sample_data(physeq), "data.frame")
   
   # Adonis test
-  adonis.bdist <- adonis(bdist ~ col)
-  print("Adonis results:")
-  print(adonis.bdist)
-  
-  # Homogeneity of dispersion test
-  betatax = betadisper(bdist,col)
-  disper.test = permutest(betatax)
-  print("Betadisper results:")
-  print(disper.test$tab)
+  f <- reformulate(formula, response = "phydist")
+  adonis.test <- adonis(f, data = metadata)
+  print(adonis.test)
 
-  l <- list(dist=bdist, factor=col, adonis=adonis.bdist, disper=disper.test)
+  # Run homogeneity of dispersion test if there is only 1 variable
+  if (length(formula) == 1) {
+    
+    group <- metadata[,formula]
+    beta <- betadisper(phydist, group)
+    disper.test = permutest(beta)
+    print(disper.test)
+    
+    l <- list(
+      dist = phydist, 
+      formula = f, 
+      adonis = adonis.test, 
+      disper = disper.test
+    )
+  
+  } else {
+
+    l <- list(
+      dist = phydist, 
+      formula = f, 
+      adonis = adonis.test
+    )
+  }
   return (l)
 }
-
 
 ########## Bar Plots #################
 
 # This function takes a phyloseq object, agglomerates OTUs to the desired taxonomic rank, 
 # prunes out OTUs below a certain relative proportion in a sample (ie 1% ) 
-# and melts the phyloseq object into long format.
-transform_and_melt <- function(physeq, taxrank, prune) {
+# and melts the phyloseq object into long format which is suitable for ggplot stacked barplots.
+taxglom_and_melt <- function(physeq, taxrank, prune){
   
   # Agglomerate all otu's by given taxonomic level
-  physeq_taxrank <- tax_glom(physeq, taxrank = taxrank)
+  pglom <- tax_glom(physeq, taxrank = taxrank)
   
   # Create a new phyloseq object which removes taxa from each sample below the prune parameter
-  physeq_taxrank.prune <- transform_sample_counts(physeq_taxrank,function(x) {x/sum(x)})
-  otu_table(physeq_taxrank.prune)[otu_table(physeq_taxrank.prune) < prune] <- 0
-  physeq_taxrank.prune <- prune_taxa(taxa_sums(physeq_taxrank.prune) > 0, physeq_taxrank.prune)
+  pglom_prune <- transform_sample_counts(pglom,function(x) {x/sum(x)})
+  otu_table(pglom_prune)[otu_table(pglom_prune) < prune] <- 0
+  pglom_prune <- prune_taxa(taxa_sums(pglom_prune) > 0, pglom_prune)
   
-  # Melt into long format and sort by sample and taxrank
-  physeq_taxrank.long <- psmelt(physeq_taxrank.prune)
-  names(physeq_taxrank.long)[names(physeq_taxrank.long) == taxrank] <- "Taxonomy"
-  physeq_taxrank.long <- arrange(physeq_taxrank.long, Sample, Taxonomy)
+  # Melt into long format and sort by taxonomy
+  physeq_long <- psmelt(pglom_prune)
+  physeq_long <- physeq_long[order(physeq_long[ ,taxrank]), ]
 
   # Return long data frame
-  return(physeq_taxrank.long)
+  return(physeq_long)
 }
 
-
-# This function takes  a data frame in long format 
-# (such as the output from transform_and_melt) 
-# and produces a stacked barplot of community composition.
-make_tax_barplot <- function(df, x, y, tax, facet, title, colors, xlab, ylab, relative, outline, guide) {
-  ggplot(df, aes_string(x = x, y = y, fill = tax)) +
-    facet_grid(reformulate(facet), scales="free_y") +
-    geom_bar(stat = "identity", show_guide = guide) +
-    scale_fill_manual(values = colors) +
-    scale_x_discrete(
-      breaks = c("6/10", "7/8", "8/4", "9/2", "10/6", "11/3"),
-      labels = c("Jun", "Jul", "Aug", "Sep", "Oct", "Nov"), drop = FALSE
-    ) +
-    theme(
-      axis.title.x = element_text(size = 16,face = "bold"),
-      axis.text.x = element_text(angle = 50, colour = "black", vjust = 1, hjust = 1, size = 13),
-      axis.text.y = element_text(colour = "black", size = 10),
-      axis.title.y = element_text(face = "bold", size = 16),
-      plot.title = element_text(size = 18),
-      legend.title = element_text(size = 14),
-      legend.text = element_text(size = 13),
-      legend.position = "right",
-      strip.text.x = element_text(size = 16, face = "bold"),
-      strip.text.y = element_text(size = 16, face = "bold"),
-      strip.background = element_rect(color = "white",size = 2, fill = NA),
-      panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
-      panel.border = element_rect(colour = "black", fill = NA, size = 1.5),
-      panel.margin = unit(1, "lines")
-    ) +
-    guides(fill = guide_legend(reverse = TRUE, keywidth = 1, keyheight = 1)) +
-    xlab(xlab) +
-    ylab(ylab) +
-    ggtitle(title) +
-    if (relative) {
-      geom_bar(
-        stat = "identity",position = "fill", colour = outline,show_guide = FALSE
-      )
-    } else {
-      geom_bar(stat = "identity",colour = outline,show_guide = FALSE)
-    }
-  
-}
-
-
-
-############## Ordinations ######################
-
-# Wrapper function for creating an ordination
-# 1) scales an OTU table 
-# 2) Ordinates
-# 3) Plots ordination
-
-ord_wrapper <- function(physeq, n,
-  method, distance, colors = NULL, 
-  factor.color, factor.shape, title){
-
-  physeq.scale <- scale_reads(physeq, n)
-  physeq.ordinate <- ordinate(physeq.scale, method = method, distance = distance)
-  
-  # Plot the ordination
-  myordplot(physeq.scale, physeq.ordinate, colors, factor.color, factor.shape, title)
-}
-
-
-myordplot <- function (physeq, ordination, colors, factor.color, factor.shape, title){
-  plot_ordination(
-    physeq = physeq, 
-    ordination = ordination, 
-    color = factor.color, 
-    shape = factor.shape) +
-  geom_point(
-    aes_string(color = factor.color), 
-    alpha = 0.7, 
-    size = 4) +
-  geom_point(
-    colour="grey90", 
-    size = 1.5) + 
-  ggtitle(title) +
-  if(!is.null(colors)){
-    scale_color_manual(values = colors)
-  }
-  
-}
 
 ###### Merge functions ############
 
 # Merge samples by averaging OTU counts instead of summing
-merge_samples_mean <- function(physeq, group){
+merge_samples_mean <- function(physeq, group, round){
   # Calculate the number of samples in each group
   group_sums <- as.matrix(table(sample_data(physeq)[ ,group]))[,1]
   
@@ -164,17 +117,22 @@ merge_samples_mean <- function(physeq, group){
   # Calculation is done while taxa are columns
   x <- as.matrix(otu_table(merged))
   if(taxa_are_rows(merged)){ x<-t(x) }
-  out <- floor(t(x/group_sums))
+
+  # Pick the rounding functions
+  if (round == "floor"){
+    out <- floor(t(x/group_sums))
+  } else if (round == "round"){
+    out <- matround(t(x/group_sums))
+  }
   
-  # Return new phyloseq object with
-  
+  # Return new phyloseq object with taxa as rows
   out <- otu_table(out, taxa_are_rows = TRUE)
   otu_table(merged) <- out
   return(merged)
 }
 
-# Merge samples, just including OTUs that were present in all
-
+# Merge samples, just including OTUs that were present in all merged samples
+# Call this function before running merge_samples()
 merge_OTU_intersect <- function(physeq, group){
   
   # Make sure we're not starting with more taxa than we need 
@@ -195,7 +153,7 @@ merge_OTU_intersect <- function(physeq, group){
     print(dim(cat.sub))
     
     # Find the indices of 0's in the OTU table
-    zeros <- apply(cat.sub, 1, function(r) any(r==0))
+    zeros <- apply(cat.sub, 1, function(r) any(r == 0))
     
     # If an OTU had a 0 in at least one sample, change all samples to 0
     cat.sub[zeros,] <- 0

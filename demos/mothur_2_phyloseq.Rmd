@@ -1,15 +1,26 @@
 ---
-title: "Mothur to Phyloseq Demo"
+title: "Microbial Community Diversity Analysis Tutorial with Phyloseq"
 output:
   html_document:
-    toc: true
-    theme: united
+    css: markdown.css
+    fig.height: 10
+    fig.width: 14
 ---
-This is a script to demonstrate how to import mothur files into R using phyloseq and run some basic analyses/ plots
+This is a demo of how to import amplicon microbiome data into R using [Phyloseq](http://joey711.github.io/phyloseq/) and run some basic analyses to 
+understand microbial community diversity and composition accross your samples. 
+More demos of this package are available from the authors [here](http://joey711.github.io/phyloseq-demo/phyloseq-demo.html). 
+This script was created with [Rmarkdown](http://rmarkdown.rstudio.com/).
 
-Author: Michelle Berry
+Author: Michelle Berry     
+Date: September 3rd, 2015 
 
-Date: September 3rd, 2015
+===================================================================
+
+In this tutorial, we are working with illumina 16s data that has already been processed into an [OTU](https://en.wikipedia.org/wiki/Operational_taxonomic_unit) and taxonomy table from the [mothur](http://www.mothur.org/) pipeline. Phyloseq has a variety of [import](http://joey711.github.io/phyloseq/import-data) options if you processed your raw sequence data with a different pipeline.
+
+The samples were collected from the Western basin of Lake Erie between May and November 2014 at three different locations. The goal of this dataset was to understand how the bacterial community in Lake Erie shifts during toxic [algal blooms](http://www.glerl.noaa.gov/res/HABs_and_Hypoxia/) caused predominantly by a genus of cyanobacteria called [Microcystis](https://en.wikipedia.org/wiki/Microcystis). Water samples were fractionated to distinguish free-living bacteria, particle-associated bacteria, and larger colonies of blooming cyanobacteria.
+      
+In this tutorial, we will learn how to import an OTU table and sample metadata into R with the Phyloseq package. We will perform some basic exploratory analyses, examining the taxonomic composition of our samples, and visualizing the dissimilarity between our samples in a low-dimensional space using ordinations. Lastly, we will estimate the alpha diversity (richness and evenness) of our samples.
 
 # Libraries
 ```{r load libraries, warning = FALSE, message = FALSE}
@@ -36,168 +47,272 @@ source("habs_functions.R")
 
 # Data import
 
-here we import the mothur shared file, consensus taxonomy file, 
-and our sample metadata and store them in one phyloseq object
+First, we will import the mothur shared file, consensus taxonomy file, 
+and our sample metadata and store them in one phyloseq object.
+By storing all of our data structures together in one object we can easily interface between each of the structures. For example, as we will see later, we can use criteria in the sample metadata to select certain samples from the OTU table. 
+
 ```{r mothur import}
 
-# Import mothur files and sample metadata
+# Assign variables for imported data
 sharedfile = "mothur/allhabs.shared"
 taxfile = "mothur/allhabs.taxonomy"
 mapfile = "other/habs_metadata.csv"
- 
+
+# Import mothur data
 mothurdata = import_mothur(mothur_shared_file = sharedfile,
   mothur_constaxonomy_file = taxfile)
 
 # Import sample metadata
 map <- read.csv(mapfile)
+```
+The sample metadata is just a basic csv with columns for sample attributes.
+Here is a preview of what the sample metadata looks like. As you can see, there is one column
+called SampleID with the names of each of the samples. The remaining columns contain information on
+the environmental or sampling conditions related to each sample.
+```{r}
+head(map)
+```
+
+We convert this dataframe into phyloseq format with a simple constructor.
+The only formatting required to merge the sample data into a phyloseq object is that the 
+rownames must match the sample names in your shared and taxonomy files. 
+```{r}
 map <- sample_data(map)
+
+# Assign rownames to be Sample ID's
 rownames(map) <- map$SampleID
-  
+```
+
+We need to merge our metadata into our phyloseq object. 
+```{r}
 # Merge mothurdata object with sample metadata
 moth_merge = merge_phyloseq(mothurdata, map)
 moth_merge
 ```
-Now we have a phyloseq object called moth_merge. 
 
-Before we move on with analysis, we need to do some basic reformatting and filtering 
+Now we have a phyloseq object called moth_merge. If we wanted to, we could also 
+add a phylogenetic tree or a fasta with OTU representative sequences into this object.
+At anytime, we can print out the data structures stored in a phyloseq object to 
+quickly view its contents.
+
+Before we move on with analysis, we need to do some basic reformatting and filtering. 
+
+What are the column names of our taxonomy file? 
+
 ```{r}
-#  I like to add the OTU number as a column in the taxonomy file
-tax_table(moth_merge) <- cbind(tax_table(moth_merge), 
-  row.names(tax_table(moth_merge)))
-
 colnames(tax_table(moth_merge))
-# These taxonomy names are not helpful, so let's rename them
-colnames(tax_table(moth_merge)) <- c("Kingdom", "Phylum", "Class",
-  "Order", "Family", "Genus", "Species")
-  
-# Filter out non-samples (i.e. water, mock, blanks) 
-# Note, there is a column in my metadata named "Type"
-# Also prune out taxa which were only present in removed samples
-moth_good <- subset_samples(moth_merge,Type == "sample")
-moth_good <- prune_taxa(taxa_sums(moth_good) > 0, moth_good)
+```
 
-# Filter out non-bacteria, chloroplasts and mitochondria 
-# You may have done this already in mothur, but it's good to check
-moth_good <- subset_taxa(moth_good, Kingdom == "Bacteria")
-moth_good <- subset_taxa(moth_good, Class != "Chloroplast")
-moth_good <- subset_taxa(moth_good, Family != "mitochondria")
+These taxonomy names are not helpful, so let's rename them
+
+```{r}
+colnames(tax_table(moth_merge)) <- c("Kingdom", "Phylum", "Class", 
+  "Order", "Family", "Genus")
+```
+    
+Now, let's filter out samples we don't want to include in our analysis
+such as the extraction and pcr blanks (We can look at these later to see what's there)
+Note: there is a column in my metadata named "Type"
+
+```{r}
+moth_sub <- subset_samples(moth_merge, Type == "sample")
+moth_sub <- prune_taxa(taxa_sums(moth_sub) > 0, moth_sub)
+```
+
+Now we will filter out Eukaryotes, Archaea, chloroplasts and mitochondria,
+because we only intended to amplify bacterial sequences. 
+You may have done this filtering already in mothur, but it's good to check
+you don't have anything lurking in the taxonomy table. I like to keep these organisms
+in my dataset when running mothur because they are easy enough to remove with Phyloseq
+and sometimes I'm interested in exploring them. 
+```{r}
+moth_sub <- subset_taxa(moth_sub, Kingdom == "Bacteria")
+moth_sub <- subset_taxa(moth_sub, Family != "mitochondria")
+moth_good <- subset_taxa(moth_sub, Class != "Chloroplast")
 moth_good
 ```
 
 # Sample summary
 
-First, we will look at the distribution of read counts from our samples
-
-
-A lot of the 100um samples have very low read counts because a majority 
-of the reads were chloroplasts. This is important to keep in mind for 
-beta diversity analyses, because to include all the samples we need 
-to really throw out a lot of data to normalize the sequencing depth.
+As a first analysis, we will look at the distribution of read counts from our samples
 
 ```{r}
 # Histogram of sample read counts
 theme_set(theme_bw())
 ggplot(data.frame(sum = sample_sums(moth_good)), aes(sum)) + 
-  geom_histogram(colour = "white", fill = "indianred") +
-  ggtitle("Sample read counts") + 
-  xlab("total sequences")
+geom_histogram(color = "black", fill = "indianred") +
+ggtitle("Distribution of sample sequencing depth") + 
+xlab("Read counts") +
+ylab("")
 
 # mean, max and min of sample read counts
-mins <- min(sample_sums(moth_good))
-means <- mean(sample_sums(moth_good))
-maxs <- max(sample_sums(moth_good))
+smin <- min(sample_sums(moth_good))
+smean <- mean(sample_sums(moth_good))
+smax <- max(sample_sums(moth_good))
 
 ```
-The minimum sample read count is "mins"
-The mean sample read count is "means"
-The max sample read count is "maxs"
+The minimum sample read count is `r smin`     
+The mean sample read count is `r round(smean, 1)`      
+The max sample read count is `r smax` 
+
+It's a good thing we did this, because this distribution looks quite strange.
+It turns out that a majority of reads from the 100um and 53um samples 
+were chloroplasts. Once we removed these sequences, we ended up with very small
+library sizes in about half of our samples.  
+
+Let's look at our distribution with chloroplasts included (good thing we didn't remove them in mothur):
+
+```{r}
+ggplot(data.frame(sum = sample_sums(moth_sub)), aes(sum)) + 
+geom_histogram(color = "black", fill = "blue") +
+ggtitle("Distribution of sample sequencing depth with chloroplasts") + 
+xlab("Read counts") +
+ylab("")
+```
+
+Okay, this looks better. However, for most of our analyses we won't want to include chloroplasts. We also don't want to throw away all of these samples, so we'll have to be careful about which groups of samples we compare and keep in mind how much data we have to throw out to standardize to these low read samples. 
 
 
 # Stacked barplots
 
-Here we make a stacked barplot of phylum community composition 
-across filter fractions and sampling stations. 
+Let's make a stacked barplot of Phyla to get a sense of the community composition in these samples. 
 
-These utility functions are highly flexible and can be adapted to the variables
-in your own dataset
-```{r composition barplot, fig.height=10,fig.width=14}
+Since this is not a quantitative analysis, and since we have more Phyla in this dataset than we can reasonably distinguish colors (46!), we will prune out low abundance taxa and only include Phyla that contribute more than 2% of the relative abundance of each sample. Depending on your dataset and the taxonomic level you are depicting, you can adjust this prune parameter. In later analyses, we will of course included these taxa, but for now they will just clutter our plot.
 
+We also have 300 samples, which a lot to depict in one plot. For now, we will just look 
+at the full community samples. 
 
-# Transform to long format and prune out phyla below 5% in each sample
-# for easier to read stacked barplot
-moth.long <- transform_and_melt(
-  physeq = moth_good,
-	taxrank = "Phylum",
-	prune = .05)
+```{r, echo = FALSE}
 
-# Special formatting for these samples
-moth.format <- habs_format(phy.long = moth.long)
-
-# Set phylum colors for plotting
-phylum.colors <- c(
-  "#CBD588", "#5F7FC7", "orange","#DA5724", "#89C5DA", "#508578", "#CD9BCD",
-  "#74D944", "#D7C1B1", "#AD6F3B", "#673770","#D14285","#689030",
-  "#6DDE88", "#652926", "#7FDCC0", "#C84248", "#8569D5", "#5E738F",
-  "#D1A33D", "#8A7C64", "#599861"
-)
-
-# Plot 
-make_tax_barplot(
-  df = moth.format, 
-  x = "Date", 
-  y = "Abundance",
-  tax = "Taxonomy",
-  facet = "Fraction~Station",
-  title = "",
-  colors = phylum.colors,
-  xlab = "",
-  ylab = "Relative Abundance\n",
-  outline = "black",
-  relative = TRUE,
-  guide = TRUE
-)
+stackbar_theme <- theme(
+  axis.title.x = element_text(size = 16,face = "bold"),
+  axis.text.x = element_text(angle = 50, 
+    face = "bold", 
+    vjust = 1, 
+    hjust = 1, 
+    size = 15),
+  axis.text.y = element_text(colour = "black", size = 10),
+  axis.title.y = element_text(face = "bold", size = 16),
+  plot.title = element_text(face = "bold", size = 22),
+  legend.title = element_text(face = "bold", size = 16),
+  legend.text = element_text(size = 14),
+  strip.text.x = element_text(size = 16, face = "bold"),
+  strip.text.y = element_text(size = 16, face = "bold"),
+  strip.background = element_rect(color = "white",size = 2, fill = NA),
+  panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+  panel.border = element_rect(colour = "black", fill = NA, size = 1.5),
+  panel.margin = unit(1, "lines")
+) 
 
 
 ```
 
-# Ordinations
 
-This is an example of how to make an ordination such as a Principle Coordintes Analysis. 
-More documentation on these function is available 
-```{r}
-# Subset to full community fraction (CNA), and apply special formatting
-CNA.format <- habs_ord_format(physeq = moth_good, fraction = "CNA")
+```{r composition barplot, fig.height=10,fig.width=14}
+# Subset to full community
+Full <- subset_samples(moth_good, Fraction == "CNA")
 
-ord_wrapper(
-  physeq = CNA.format, 
-  n = min(sample_sums(CNA.format)),
-  method = "PCoA",
-  distance = "bray",
-  colors = c("#a65628","red","#ffae19","#4daf4a","#1919ff","darkorchid3","magenta"),
-  factor.color = "Month",
-  factor.shape = "Station",
-  title = "PCoA of Lake Erie bacterial Communities"
+# Transform to long format and prune out phyla below 2% in each sample
+# for easier to read stacked barplot
+Full.long <- taxglom_and_melt(
+  physeq = Full,
+	taxrank = "Phylum",
+	prune = .02
+)
+
+# Special formatting for these samples
+Full.format <- habs_format(phy.long = Full.long)
+
+# Set colors for plotting
+phylum.colors <- c(
+  "#CBD588", "#5F7FC7", "orange","#DA5724", "#508578", "#CD9BCD",
+   "#AD6F3B", "#673770","#D14285", "#652926", "#C84248", 
+  "#8569D5", "#5E738F","#D1A33D", "#8A7C64", "#599861"
 )
 
 
+# Plot 
+ggplot(Full.format, aes(x = Date, y = Abundance, fill = Phylum)) + 
+facet_grid(Station~., scales = "free_y") +
+geom_bar(stat = "identity") +
+geom_bar(
+  stat = "identity", 
+  position = "fill", 
+  colour = "black", 
+  show_guide = FALSE
+) + 
+scale_fill_manual(values = phylum.colors) +
+scale_x_discrete(
+    breaks = c("6/10", "7/8", "8/4", "9/2", "10/6", "11/3"),
+    labels = c("Jun", "Jul", "Aug", "Sep", "Oct", "Nov"), 
+    drop = FALSE
+) + 
+stackbar_theme +
+guides(fill = guide_legend(reverse = TRUE, keywidth = 1, keyheight = 1)) +
+xlab("") +
+ylab("Relative Abundance (Phyla > 2%) \n") +
+ggtitle("Phylum Composition of Lake Erie \nBacterial Community by Sampling Site \n") 
+        
+```
+
+This plot was created using [facets](http://www.cookbook-r.com/Graphs/Facets_(ggplot2)/) to seperate samples along the y axis by sampling station. This is a great feature of ggplot. 
+
+# Ordinations
+
+One of the best exploratory analyses for amplicon data is unconstrained ordinations.
+Here we will look at ordinations of our full community samples. We will use the scale_reads()
+function in miseqR.R to scale to the smallest library size
+```{r}
+# Scale reads to even depth 
+Full.scale <- scale_reads(physeq = Full, round = "round")
+
+# Special formatting: reordering of certain factors
+Full.scale.format <- habs_ord_format(Full.scale) 
+
+# Ordinate
+Full.pcoa <- ordinate(physeq = Full.scale.format, method = "PCoA", distance = "bray")
+
+# Plot 
+plot_ordination(
+  physeq = Full.scale.format,
+  ordination = Full.pcoa,
+  color = "Month",
+  shape = "Station",
+  title = "PCoA of Lake Erie bacterial Communities"
+) + 
+scale_color_manual(values = c("#a65628", "red", "#ffae19",
+  "#4daf4a", "#1919ff", "darkorchid3", "magenta")
+) +
+geom_point(aes(color = Month), alpha = 0.7, size = 4) +
+geom_point(colour = "grey90", size = 1.5) 
+    
 ```
 
 Let's try an NMDS instead. For NMDS plots it's important to set a seed since the starting positions of samples in the alogrithm is random
 
 ```{r}
 set.seed(1)
-ord_wrapper(
-  physeq = CNA.format, 
-  n = min(sample_sums(CNA.format)),
-  method = "NMDS",
-  distance = "bray",
-  colors = c("#a65628","red","#ffae19","#4daf4a","#1919ff","darkorchid3","magenta"),
-  factor.color = "Month",
-  factor.shape = "Station",
+
+# Ordinate
+Full.nmds <- ordinate(physeq = Full.scale.format, method = "NMDS", distance = "bray")
+
+# Plot 
+plot_ordination(
+  physeq = Full.scale.format,
+  ordination = Full.nmds,
+  color = "Month",
+  shape = "Station",
   title = "NMDS of Lake Erie bacterial Communities"
-)
+) + 
+scale_color_manual(values = c("#a65628", "red", "#ffae19",
+  "#4daf4a", "#1919ff", "darkorchid3", "magenta")
+) +
+geom_point(aes(color = Month), alpha = 0.7,size = 4) +
+geom_point(colour = "grey90", size = 1.5) 
+
 ```
 
+NMDS plots attempt to show **ordinal** distances between samples as accurately as possible in two dimensions. It is important to report the stress of these plots, because a high stress value means that the algorithm had a hard time representing the distances between samples in 2 dimensions. The stress of this plot was OK - it was .148 (generally anything below .2 is considered acceptable). However, the PCoA for this data was able to show a lot of variation in just two dimensions, and it shows the temporal trends in this dataset better, so we will stick with that plot. 
 
 # Permanova
 
@@ -207,12 +322,135 @@ from have different centroids
 
 ```{r}
 set.seed(1)
-adonis.station <- doadonis(physeq = moth_good, category = "Station")
+
+# Subset samples to full community fraction
+Full <- subset_samples(moth_good, Fraction == "CNA")
+
+# Scale reads to minimum library size
+Full.scale <- scale_reads(physeq = Full, round = "round")
+
+# Run adonis test with bray curtis distance
+adonis.station <- phyloseq_to_adonis(
+  physeq = Full.scale, 
+  dist = "bray",
+  formula = "Station"
+)
 
 ```
-This output tells us that our adonis test is significant so we can reject he null hypothesis that
-Additionally, our betadisper results are nonsignificant, meaning we cannot reject the null hypothesis that our groups have different dispersions. This means we can be more confident that our adonis result is a real result, and not due to differences in group dispersions
+This output tells us that our adonis test is significant so we can reject the null hypothesis that our three sites have the same centroid.
 
+Additionally, our betadisper results are not significant, meaning we cannot reject the null hypothesis that our groups have the same dispersions. This means we can be more confident that our adonis result is a real result, and not due to differences in group dispersions
+
+There is a lot more analysis that can be done here. We could use a distance metric other than Bray-curtis, we could test different grouping variables, or we could create a more complex permanova by testing a model that combines multiple variables. Unfortunately, there are currently no [post-hoc tests](https://stat.ethz.ch/pipermail/r-sig-ecology/2012-November/003364.html) developed for adonis.
+
+# Alpha Diversity
+
+Estimating alpha diversity of microbial communities is [problematic](http://www.ncbi.nlm.nih.gov/pmc/articles/PMC93182/) no matter what you do. My best stab at it is to subsample the libraries with replacement to estimate the species abundance of the real population while standardizing sampling effort. 
+
+To simplify things, we will just estimate OTU richness and evenness for the full community samples. 
+```{r}
+min(sample_sums(Full))
+
+```
+Since our minimum library size is 15,631, we will subsample to 15,000 reads. 
+We will repeat this 100 times and average the diversity estimates from each trial. 
+
+```{r, cache=TRUE}
+# Initialize matrices to store richness and evenness estimates
+nsamp = nsamples(Full)
+trials = 100
+
+richness = matrix(nrow = nsamp, ncol = trials)
+row.names(richness) <- sample_names(Full)
+
+evenness = matrix(nrow = nsamp, ncol = trials)
+row.names(evenness) <- sample_names(Full)
+
+# It is always important to set a seed when you subsample so your result is replicable 
+set.seed(3)
+
+for (i in 1:100) {
+  # Subsample
+  r <- rarefy_even_depth(Full, sample.size = 15000, verbose = FALSE, replace = TRUE)
+  
+  # Calculate richness
+  rich <- as.numeric(as.matrix(estimate_richness(r, measures = "Observed")))
+  richness[ ,i] <- rich
+  
+  # Calculate evenness
+  even <- as.numeric(as.matrix(estimate_richness(r, measures = "InvSimpson")))
+  evenness[ ,i]=even
+}
+```
+
+Let's calculate the mean and standard deviation per sample for observed richness and inverse simpson's index and store those values in a dataframe.
+
+```{r}
+# Create a new dataframe to hold the means and standard deviations of richness estimates
+SampleID <- row.names(richness)
+mean <- apply(richness, 1, mean)
+sd <- apply(richness, 1, sd)
+measure <- rep("Richness", nsamp)
+rich.stats <- data.frame(SampleID, mean, sd, measure)
+
+# Create a new dataframe to hold the means and standard deviations of evenness estimates
+SampleID <- row.names(evenness)
+mean <- apply(evenness, 1, mean)
+sd <- apply(evenness, 1, sd)
+measure <- rep("Inverse Simpson", nsamp)
+even.stats <- data.frame(SampleID, mean, sd, measure)
+
+```
+
+Now we will combine our estimates for richness and evenness into one dataframe
+```{r}
+alpha <- rbind(rich.stats, even.stats)
+```
+
+Let's add the sample metadata into this dataframe using the merge() command 
+```{r}
+s <- data.frame(sample_data(Full))
+alphadiv <- merge(alpha, s, by = "SampleID") 
+```
+
+Lastly, we will reorder some factors in this dataset before plotting them
+```{r}
+alphadiv <- order_dates(alphadiv)
+alphadiv$Station <- factor(alphadiv$Station, levels = c("WE2", "WE4", "WE12"))
+```
+
+Finally, we will plot the two alpha diversity measures in a timeseries using a facet
+
+```{r}
+
+theme_set(theme_classic())
+
+ggplot(alphadiv, 
+  aes(x = Date, 
+      y = mean, 
+      color = Station, 
+      group = Station, 
+      shape = Station
+  )
+) +
+geom_point(size = 2) + 
+geom_line(size = 0.8) +
+facet_wrap(~measure, ncol = 1, scales = "free") +
+ylab("") +
+xlab("") +
+ggtitle("") +
+scale_color_manual(values = c("#E96446", "#302F3D", "#87CEFA")) +
+theme(
+  axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1, size = 10, face = "bold"),
+  plot.margin = unit(c(0, 0, 1, 0), "lines"),
+  strip.background = element_rect(color = "white"),
+  strip.text = element_text(face = "bold", size = 14),
+  panel.margin = unit(1, "lines")
+)
+
+```
+
+           
 
 # Session info
 ```{r}
