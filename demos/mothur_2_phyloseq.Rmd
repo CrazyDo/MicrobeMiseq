@@ -26,8 +26,9 @@ In this tutorial, we will learn how to import an OTU table and sample metadata i
 ```{r load libraries, warning = FALSE, message = FALSE}
 #Load libraries
 library(ggplot2)
+library(magrittr)
 library(vegan)
-library(plyr)
+library(dplyr)
 library(scales)
 library(grid)
 library(reshape2)
@@ -59,7 +60,7 @@ taxfile = "mothur/allhabs.taxonomy"
 mapfile = "other/habs_metadata.csv"
 
 # Import mothur data
-mothurdata = import_mothur(mothur_shared_file = sharedfile,
+mothurdata <- import_mothur(mothur_shared_file = sharedfile,
   mothur_constaxonomy_file = taxfile)
 
 # Import sample metadata
@@ -86,11 +87,11 @@ rownames(map) <- map$SampleID
 We need to merge our metadata into our phyloseq object. 
 ```{r}
 # Merge mothurdata object with sample metadata
-moth_merge = merge_phyloseq(mothurdata, map)
-moth_merge
+moth.merge = merge_phyloseq(mothurdata, map)
+moth.merge
 ```
 
-Now we have a phyloseq object called moth_merge. If we wanted to, we could also 
+Now we have a phyloseq object called moth.merge. If we wanted to, we could also 
 add a phylogenetic tree or a fasta with OTU representative sequences into this object.
 At anytime, we can print out the data structures stored in a phyloseq object to 
 quickly view its contents.
@@ -100,13 +101,13 @@ Before we move on with analysis, we need to do some basic reformatting and filte
 What are the column names of our taxonomy file? 
 
 ```{r}
-colnames(tax_table(moth_merge))
+colnames(tax_table(moth.merge))
 ```
 
 These taxonomy names are not helpful, so let's rename them
 
 ```{r}
-colnames(tax_table(moth_merge)) <- c("Kingdom", "Phylum", "Class", 
+colnames(tax_table(moth.merge)) <- c("Kingdom", "Phylum", "Class", 
   "Order", "Family", "Genus")
 ```
     
@@ -115,8 +116,8 @@ such as the extraction and pcr blanks (We can look at these later to see what's 
 Note: there is a column in my metadata named "Type"
 
 ```{r}
-moth_sub <- subset_samples(moth_merge, Type == "sample")
-moth_sub <- prune_taxa(taxa_sums(moth_sub) > 0, moth_sub)
+moth.sub <- subset_samples(moth.merge, Type == "sample")
+moth.sub <- prune_taxa(taxa_sums(moth.sub) > 0, moth.sub)
 ```
 
 Now we will filter out Eukaryotes, Archaea, chloroplasts and mitochondria,
@@ -126,10 +127,12 @@ you don't have anything lurking in the taxonomy table. I like to keep these orga
 in my dataset when running mothur because they are easy enough to remove with Phyloseq
 and sometimes I'm interested in exploring them. 
 ```{r}
-moth_sub <- subset_taxa(moth_sub, Kingdom == "Bacteria")
-moth_sub <- subset_taxa(moth_sub, Family != "mitochondria")
-moth_good <- subset_taxa(moth_sub, Class != "Chloroplast")
-moth_good
+erie <- 
+  moth.sub %>%
+  subset_taxa(Kingdom == "Bacteria" &
+              Family != "mitochondria" &
+              Class != "Chloroplast")
+erie
 ```
 
 # Sample summary
@@ -139,16 +142,17 @@ As a first analysis, we will look at the distribution of read counts from our sa
 ```{r}
 # Histogram of sample read counts
 theme_set(theme_bw())
-ggplot(data.frame(sum = sample_sums(moth_good)), aes(sum)) + 
-geom_histogram(color = "black", fill = "indianred") +
-ggtitle("Distribution of sample sequencing depth") + 
-xlab("Read counts") +
-ylab("")
+
+ggplot(data.frame(sum = sample_sums(erie)), aes(sum)) + 
+  geom_histogram(color = "black", fill = "indianred") +
+  ggtitle("Distribution of sample sequencing depth") + 
+  xlab("Read counts") +
+  ylab("")
 
 # mean, max and min of sample read counts
-smin <- min(sample_sums(moth_good))
-smean <- mean(sample_sums(moth_good))
-smax <- max(sample_sums(moth_good))
+smin <- min(sample_sums(erie))
+smean <- mean(sample_sums(erie))
+smax <- max(sample_sums(erie))
 
 ```
 The minimum sample read count is `r smin`     
@@ -163,11 +167,11 @@ library sizes in about half of our samples.
 Let's look at our distribution with chloroplasts included (good thing we didn't remove them in mothur):
 
 ```{r}
-ggplot(data.frame(sum = sample_sums(moth_sub)), aes(sum)) + 
-geom_histogram(color = "black", fill = "blue") +
-ggtitle("Distribution of sample sequencing depth with chloroplasts") + 
-xlab("Read counts") +
-ylab("")
+ggplot(data.frame(sum = sample_sums(moth.sub)), aes(sum)) + 
+  geom_histogram(color = "black", fill = "blue") +
+  ggtitle("Distribution of sample sequencing depth with chloroplasts") + 
+  xlab("Read counts") +
+  ylab("")
 ```
 
 Okay, this looks better. However, for most of our analyses we won't want to include chloroplasts. We also don't want to throw away all of these samples, so we'll have to be careful about which groups of samples we compare and keep in mind how much data we have to throw out to standardize to these low read samples. 
@@ -209,19 +213,14 @@ stackbar_theme <- theme(
 
 
 ```{r composition barplot, fig.height=10,fig.width=14}
-# Subset to full community
-Full <- subset_samples(moth_good, Fraction == "CNA")
-
+# Subset to full community,
 # Transform to long format and prune out phyla below 2% in each sample
 # for easier to read stacked barplot
-Full.long <- taxglom_and_melt(
-  physeq = Full,
-	taxrank = "Phylum",
-	prune = .02
-)
-
-# Special formatting for these samples
-Full.format <- habs_format(phy.long = Full.long)
+Full.long <-
+  erie %>%
+    subset_samples(Fraction == "CNA") %>%
+    taxglom_and_melt(taxrank = "Phylum", prune = 0.02) %>%
+    habs_format()
 
 # Set colors for plotting
 phylum.colors <- c(
@@ -232,26 +231,26 @@ phylum.colors <- c(
 
 
 # Plot 
-ggplot(Full.format, aes(x = Date, y = Abundance, fill = Phylum)) + 
-facet_grid(Station~., scales = "free_y") +
-geom_bar(stat = "identity") +
-geom_bar(
-  stat = "identity", 
-  position = "fill", 
-  colour = "black", 
-  show_guide = FALSE
-) + 
-scale_fill_manual(values = phylum.colors) +
-scale_x_discrete(
+ggplot(Full.long, aes(x = Date, y = Abundance, fill = Phylum)) + 
+  facet_grid(Station~., scales = "free_y") +
+  geom_bar(stat = "identity") +
+  geom_bar(
+    stat = "identity", 
+    position = "fill", 
+    colour = "black", 
+    show_guide = FALSE
+  ) + 
+  scale_fill_manual(values = phylum.colors) +
+  scale_x_discrete(
     breaks = c("6/10", "7/8", "8/4", "9/2", "10/6", "11/3"),
     labels = c("Jun", "Jul", "Aug", "Sep", "Oct", "Nov"), 
     drop = FALSE
-) + 
-stackbar_theme +
-guides(fill = guide_legend(reverse = TRUE, keywidth = 1, keyheight = 1)) +
-xlab("") +
-ylab("Relative Abundance (Phyla > 2%) \n") +
-ggtitle("Phylum Composition of Lake Erie \nBacterial Community by Sampling Site \n") 
+  ) + 
+  stackbar_theme +
+  guides(fill = guide_legend(reverse = TRUE, keywidth = 1, keyheight = 1)) +
+  xlab("") +
+  ylab("Relative Abundance (Phyla > 2%) \n") +
+  ggtitle("Phylum Composition of Lake Erie \nBacterial Community by Sampling Site \n") 
         
 ```
 
@@ -264,13 +263,17 @@ Here we will look at ordinations of our full community samples. We will use the 
 function in miseqR.R to scale to the smallest library size
 ```{r}
 # Scale reads to even depth 
-Full.scale <- scale_reads(physeq = Full, round = "round")
+Full.scale.format <-
+  erie %>%
+    subset_samples(Fraction == "CNA") %>%
+    scale_reads(round = "round") %>%
+    habs_ord_format() 
 
-# Special formatting: reordering of certain factors
-Full.scale.format <- habs_ord_format(Full.scale) 
 
 # Ordinate
-Full.pcoa <- ordinate(physeq = Full.scale.format, method = "PCoA", distance = "bray")
+Full.pcoa <- ordinate(physeq = Full.scale.format, 
+                      method = "PCoA", 
+                      distance = "bray")
 
 # Plot 
 plot_ordination(
@@ -280,11 +283,11 @@ plot_ordination(
   shape = "Station",
   title = "PCoA of Lake Erie bacterial Communities"
 ) + 
-scale_color_manual(values = c("#a65628", "red", "#ffae19",
-  "#4daf4a", "#1919ff", "darkorchid3", "magenta")
-) +
-geom_point(aes(color = Month), alpha = 0.7, size = 4) +
-geom_point(colour = "grey90", size = 1.5) 
+  scale_color_manual(values = c("#a65628", "red", "#ffae19",
+    "#4daf4a", "#1919ff", "darkorchid3", "magenta")
+  ) +
+  geom_point(aes(color = Month), alpha = 0.7, size = 4) +
+  geom_point(colour = "grey90", size = 1.5) 
     
 ```
 
@@ -294,7 +297,9 @@ Let's try an NMDS instead. For NMDS plots it's important to set a seed since the
 set.seed(1)
 
 # Ordinate
-Full.nmds <- ordinate(physeq = Full.scale.format, method = "NMDS", distance = "bray")
+Full.nmds <- ordinate(physeq = Full.scale.format, 
+                      method = "NMDS", 
+                      distance = "bray")
 
 # Plot 
 plot_ordination(
@@ -304,11 +309,11 @@ plot_ordination(
   shape = "Station",
   title = "NMDS of Lake Erie bacterial Communities"
 ) + 
-scale_color_manual(values = c("#a65628", "red", "#ffae19",
-  "#4daf4a", "#1919ff", "darkorchid3", "magenta")
-) +
-geom_point(aes(color = Month), alpha = 0.7,size = 4) +
-geom_point(colour = "grey90", size = 1.5) 
+  scale_color_manual(values = c("#a65628", "red", "#ffae19",
+    "#4daf4a", "#1919ff", "darkorchid3", "magenta")
+  ) +
+  geom_point(aes(color = Month), alpha = 0.7, size = 4) +
+  geom_point(colour = "grey90", size = 1.5) 
 
 ```
 
@@ -324,7 +329,7 @@ from have different centroids
 set.seed(1)
 
 # Subset samples to full community fraction
-Full <- subset_samples(moth_good, Fraction == "CNA")
+Full <- subset_samples(erie, Fraction == "CNA")
 
 # Scale reads to minimum library size
 Full.scale <- scale_reads(physeq = Full, round = "round")
@@ -349,6 +354,10 @@ Estimating alpha diversity of microbial communities is [problematic](http://www.
 
 To simplify things, we will just estimate OTU richness and evenness for the full community samples. 
 ```{r}
+Full <-
+  erie %>%
+  subset_samples(Fraction == "CNA")
+
 min(sample_sums(Full))
 
 ```
@@ -360,10 +369,10 @@ We will repeat this 100 times and average the diversity estimates from each tria
 nsamp = nsamples(Full)
 trials = 100
 
-richness = matrix(nrow = nsamp, ncol = trials)
+richness <- matrix(nrow = nsamp, ncol = trials)
 row.names(richness) <- sample_names(Full)
 
-evenness = matrix(nrow = nsamp, ncol = trials)
+evenness <- matrix(nrow = nsamp, ncol = trials)
 row.names(evenness) <- sample_names(Full)
 
 # It is always important to set a seed when you subsample so your result is replicable 
@@ -433,20 +442,20 @@ ggplot(alphadiv,
       shape = Station
   )
 ) +
-geom_point(size = 2) + 
-geom_line(size = 0.8) +
-facet_wrap(~measure, ncol = 1, scales = "free") +
-ylab("") +
-xlab("") +
-ggtitle("") +
-scale_color_manual(values = c("#E96446", "#302F3D", "#87CEFA")) +
-theme(
-  axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1, size = 10, face = "bold"),
-  plot.margin = unit(c(0, 0, 1, 0), "lines"),
-  strip.background = element_rect(color = "white"),
-  strip.text = element_text(face = "bold", size = 14),
-  panel.margin = unit(1, "lines")
-)
+  geom_point(size = 2) + 
+  geom_line(size = 0.8) +
+  facet_wrap(~measure, ncol = 1, scales = "free") +
+  ylab("") +
+  xlab("") +
+  ggtitle("") +
+  scale_color_manual(values = c("#E96446", "#302F3D", "#87CEFA")) +
+  theme(
+    axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1, size = 10, face = "bold"),
+    plot.margin = unit(c(0, 0, 1, 0), "lines"),
+    strip.background = element_rect(color = "white"),
+    strip.text = element_text(face = "bold", size = 14),
+    panel.margin = unit(1, "lines")
+  )
 
 ```
 
