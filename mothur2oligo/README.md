@@ -1,11 +1,13 @@
 This is a shell script for transforming mothur output to appropriate format for A. murat Eren's oligotyping pipeline. To successfully run this script, follow the instructions below.
 
-You will need access to the following mothur files to run this script. The examples of file names pertain to the Miseq SOP 
-	- taxonomy file: stability.trim.contigs.good.unique.good.filter.unique.precluster.pick.pds.wang.taxonomy
-	- group file: stability.contigs.good.groups
-	- names file: stability.trim.contigs.good.names
-	- fasta file: stability.trim.contigs.good.unique.good.filter.fasta
-
+## Files:
+You will need access to the following mothur files to run this script. The examples of file names pertain to the Mothur Miseq SOP    
+	- **taxonomy file:** stability.trim.contigs.good.unique.good.filter.unique.precluster.pick.pds.wang.taxonomy        
+	- **group file:** stability.contigs.good.groups           
+	- **names file:** stability.trim.contigs.good.names     
+	- **fasta file:** stability.trim.contigs.good.unique.good.filter.fasta     
+   
+## Steps:
 
 1) Copy all the mothur files listed above into the same directory as this one          
 2) Edit getlineage.mothur and fill in the appropriate file names and locations          
@@ -14,7 +16,7 @@ You will need access to the following mothur files to run this script. The examp
 
 Any questions? contact michberr8@gmail.com
 
-Credits:    
+## Credits:    
 perl script from http://www.perlmonks.org/?node_id=975419       
 Sharon Grim helped with this shell script         
 Oligotyping pipeline: http://merenlab.org/projects/oligotyping/         
