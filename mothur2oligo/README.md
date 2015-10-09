@@ -12,7 +12,9 @@ You will need access to the following mothur files to run this script. The examp
 1) Copy all the mothur files listed above into the same directory as this one          
 2) Edit getlineage.mothur and fill in the appropriate file names and locations          
 3) Edit mothur2oligo.sh and fill in the appropriate file names at the top. Note: you will have to know the name of the output from getlineage.mothur for the 'redundant' file. If you don't, you will have to run that script first and then run the rest of the shell commands.       
-4) Once you have run this full script, you can use the '*_headers-replaced.fasta' file in the oligotyping pipeline        
+4) Once you have run this full script, you can use the '*_headers-replaced.fasta' file in the oligotyping pipeline    
+5) Instructions for downloading the oligotyping software are [here](http://merenlab.org/2014/08/16/installing-the-oligotyping-pipeline/)            
+6) Instruction for running the oligotyping software are [here](http://merenlab.org/2012/05/11/oligotyping-pipeline-explained/)   
 
 Any questions? contact michberr8@gmail.com
 
