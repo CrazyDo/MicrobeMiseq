@@ -1,7 +1,7 @@
 This is a shell script for transforming mothur output to appropriate format for A. murat Eren's oligotyping pipeline. To successfully run this script, follow the instructions below.
 
 ## Files:
-You will need access to the following mothur files to run this script. The examples of file names pertain to the Mothur Miseq SOP    
+You will need access to the following mothur files to run this script. The examples of file names pertain to the Mothur Miseq [SOP](http://www.mothur.org/wiki/MiSeq_SOP)    
 	- **taxonomy file:** stability.trim.contigs.good.unique.good.filter.unique.precluster.pick.pds.wang.taxonomy        
 	- **group file:** stability.contigs.good.groups           
 	- **names file:** stability.trim.contigs.good.names     
