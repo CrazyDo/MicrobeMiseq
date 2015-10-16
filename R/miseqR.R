@@ -5,7 +5,7 @@
 ##### Normalization #######
 
 # Better rounding function than R's base round
-matround <- function(x){trunc(x+0.5)}
+myround <- function(x){trunc(x+0.5)}
 
 
 # Scales reads by 
@@ -25,7 +25,7 @@ scale_reads <- function(physeq, n = min(sample_sums(physeq)), round = "floor") {
   if (round == "floor"){
     otu_table(physeq.scale) <- floor(otu_table(physeq.scale))
   } else if (round == "round"){
-    otu_table(physeq.scale) <- matround(otu_table(physeq.scale))
+    otu_table(physeq.scale) <- myround(otu_table(physeq.scale))
   }
   
   # Prune taxa and return new phyloseq object
@@ -54,7 +54,7 @@ phyloseq_to_adonis <- function(physeq, distmat = NULL, dist = "bray", formula) {
   print(adonis.test)
 
   # Run homogeneity of dispersion test if there is only 1 variable
-  if (length(formula) == 1) {
+  if (grepl("\\+", formula)) {
     
     group <- metadata[,formula]
     beta <- betadisper(phydist, group)
@@ -122,7 +122,7 @@ merge_samples_mean <- function(physeq, group, round){
   if (round == "floor"){
     out <- floor(t(x/group_sums))
   } else if (round == "round"){
-    out <- matround(t(x/group_sums))
+    out <- myround(t(x/group_sums))
   }
   
   # Return new phyloseq object with taxa as rows
