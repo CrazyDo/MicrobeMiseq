@@ -5,7 +5,7 @@
 ##### Normalization #######
 
 # Better rounding function than R's base round
-myround <- function(x){trunc(x+0.5)}
+myround <- function(x) { trunc(x + 0.5) }
 
 
 # Scales reads by 
@@ -40,7 +40,7 @@ scale_reads <- function(physeq, n = min(sample_sums(physeq)), round = "floor") {
 # Make sure OTU data is standardized/normalized before 
 phyloseq_to_adonis <- function(physeq, distmat = NULL, dist = "bray", formula) {
   
-  if(!is.null(distmat)){
+  if(!is.null(distmat)) {
     phydist <- distmat
   } else {
     phydist <- phyloseq::distance(physeq, dist)
@@ -55,8 +55,13 @@ phyloseq_to_adonis <- function(physeq, distmat = NULL, dist = "bray", formula) {
 
   # Run homogeneity of dispersion test if there is only 1 variable
   if (grepl("\\+", formula)) {
-    
-    group <- metadata[,formula]
+    l <- list(
+      dist = phydist, 
+      formula = f, 
+      adonis = adonis.test
+    )
+  } else {
+    group <- metadata[ ,formula]
     beta <- betadisper(phydist, group)
     disper.test = permutest(beta)
     print(disper.test)
@@ -66,14 +71,6 @@ phyloseq_to_adonis <- function(physeq, distmat = NULL, dist = "bray", formula) {
       formula = f, 
       adonis = adonis.test, 
       disper = disper.test
-    )
-  
-  } else {
-
-    l <- list(
-      dist = phydist, 
-      formula = f, 
-      adonis = adonis.test
     )
   }
   return (l)
