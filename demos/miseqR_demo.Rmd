@@ -1,0 +1,23 @@
+---
+title: "miseqR.R demo"
+output:
+  html_document:
+    toc: true
+    theme: united
+---
+
+This is a demo of how to use the functions in miseqR.R. 
+
+Author: Michelle Berry
+Date: September 5, 2015
+
+# Barplot 
+
+
+# Adonis
+
+The phyloseq_2_adonis() function is designed to take 
+
+# Merge functions
+
+These functions are built off of the standard merge_samples() function in phyloseq. 
