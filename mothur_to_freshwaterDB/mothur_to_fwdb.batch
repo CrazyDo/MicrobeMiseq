@@ -3,6 +3,7 @@
 # Copied over from:  FWGG_SerialClassification_Manual_Draft_042514 that was obtained from https://github.com/mcmahon-uw/FWMFG
 # Notes and edits by Vincent Denef and Marian Schmidt on Nov. 3, 2015
 # Additional edits by Michelle Berry on Nov. 6, 2015
+# few more edits by Vincent Denef on Nov 6, 2015
 
 
 ## Set working directory
@@ -35,10 +36,10 @@ summary.seqs(count=current)
 classify.seqs(fasta=current, count=current, reference=FW_train_2012July.fasta, taxonomy=FW_train_2012July_silvaformat.taxonomy, cutoff=80)
 
 # Select all that DO match FWDB
-system(grep -v "^[^;]*;[^;]*;[^;]*;[^;]*;unclassified" jgi16S40kitagger.trim.contigs.good.unique.good.filter.unique.precluster.pick.taxonomy.wang.taxonomy > matched_FW.80.taxonomy)
+system(grep -v "^[^;]*;[^;]*;[^;]*;[^;]*;unclassified" jgi16S40kitagger.trim.contigs.good.unique.good.filter.unique.precluster.pick.silvaformat.wang.taxonomy > matched_FW.80.taxonomy)
 
 # Select all that do NOT match FWDB
-system(grep "^[^;]*;[^;]*;[^;]*;[^;]*;unclassified" jgi16S40kitagger.trim.contigs.good.unique.good.filter.unique.precluster.pick.taxonomy.wang.taxonomy > not_matched_toFWDB.taxonomy)
+system(grep "^[^;]*;[^;]*;[^;]*;[^;]*;unclassified" jgi16S40kitagger.trim.contigs.good.unique.good.filter.unique.precluster.pick.silvaformat.wang.taxonomy > not_matched_toFWDB.taxonomy)
 
 # Retain read names of reads that do NOT match FWDB
 system(cut -f 1 not_matched_toFWDB.taxonomy > not_matched_toFWDB_readnames.taxonomy.list)
@@ -59,7 +60,7 @@ system(cat matched_FW.80.taxonomy silva.assigned.80.taxonomy > final.FWDB.Silva.
 
 # Cluster sequences into OTUs. To save memory/time we first split sequences by taxlevel 4 (order) and then cluster from there. Read mothur wiki for more info. 
 remove.lineage(fasta=current, count=current, taxonomy=final.FWDB.Silva.taxonomy, taxon=Chloroplast-Mitochondria-unknown-Archaea-Eukaryota)
-cluster.split(fasta=currenta, count=current, taxonomy=current, splitmethod=classify, taxlevel=4, cutoff=0.15)
+cluster.split(fasta=current, count=current, taxonomy=current, splitmethod=classify, taxlevel=4, cutoff=0.15)
 summary.seqs(count=current)
 
 # Determine how many sequences are in each OTU, using a .03 similarity cutoff 
