@@ -52,8 +52,8 @@ system(perl /home/vdenef/software/scripts/perl/screen_list.pl not_matched_toFWDB
 classify.seqs(fasta=unclassified_Silva.fasta, reference=silva.nr_v119.pcr.v4.align, taxonomy=silva.nr_v119.tax, cutoff=80)
 
 ###  Insert file name from above command into the below commands
-# make a copy of "unclassified_Silva.nr_v119.wang.pick.taxonomy" and name it "silva.assigned.80.taxonomy"
-system(cp unclassified_Silva.nr_v119.wang.pick.taxonomy silva.assigned.80.taxonomy)
+# make a copy of "unclassified_Silva.nr_v119.wang.taxonomy" and name it "silva.assigned.80.taxonomy"
+system(cp unclassified_Silva.nr_v119.wang.taxonomy silva.assigned.80.taxonomy)
 
 # Concatenate the FWDB matches to the SilvaDB matches into one file called "final.FWDB.Silva.taxonomy"
 system(cat matched_FW.80.taxonomy silva.assigned.80.taxonomy > final.FWDB.Silva.taxonomy)
