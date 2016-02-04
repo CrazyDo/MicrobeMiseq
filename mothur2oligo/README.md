@@ -11,7 +11,7 @@ You will need access to the following mothur files to run this script. The examp
 
 1) Copy all the mothur files listed above into the same directory as this one          
 2) Edit getlineage.mothur and fill in the appropriate file names and locations          
-3) Edit mothur2oligo.sh and fill in the appropriate file names at the top. Note: you will have to assign 'redundant' to one of the outputs from getlineage.mothur. Simply add a '.pick.redundant' onto the end of your fasta file i.e.  stability.trim.contigs.good.unique.good.filter.pick.redundant.fasta         
+3) Edit mothur2oligo.sh and fill in the appropriate file names at the top.          
 4) Once you have run this full script, you can use the '*_headers-replaced.fasta' file in the oligotyping pipeline    
 5) Instructions for downloading the oligotyping software are [here](http://merenlab.org/2014/08/16/installing-the-oligotyping-pipeline/)            
 6) Instruction for running the oligotyping software are [here](http://merenlab.org/2012/05/11/oligotyping-pipeline-explained/)   
