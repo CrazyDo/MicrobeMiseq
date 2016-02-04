@@ -4,9 +4,9 @@
 # A. murat Eren's oligotyping pipeline 
 
 # Set variables
-# Adjust these file names to your own study - these are the files from the mothur SOP
+# Adjust the groups file name to your own study - this is the filet from the mothur SOP
 groups="stability.contigs.good.groups"
-redundant="stability.trim.contigs.good.unique.good.filter.pick.redundant.fasta"
+redundant="*.pick.redundant.fasta"
 
 # Call mothur script for generating deuniqued fasta file for a specific lineage
 mothur getlineage.mothur
