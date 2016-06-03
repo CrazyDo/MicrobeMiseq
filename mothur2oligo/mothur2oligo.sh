@@ -6,7 +6,7 @@
 
 # Adjust the file names to your own study - these are the files from the mothur SOP
 taxonomy="stability.trim.contigs.good.unique.good.filter.unique.precluster.pick.pds.wang.taxonomy"
-fasta="fasta=stability.trim.contigs.good.unique.good.filter.unique.precluster.pick.fasta"
+fasta="stability.trim.contigs.good.unique.good.filter.unique.precluster.pick.fasta"
 count="stability.trim.contigs.good.unique.good.filter.unique.precluster.denovo.uchime.pick.count_table"
 processors=2
 
