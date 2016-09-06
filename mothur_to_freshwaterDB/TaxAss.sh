@@ -36,7 +36,7 @@ Rscript $(echo "$script_location/filter_seqIDs_by_pident.R") otus.custom.blast.t
 Rscript $(echo "$script_location/filter_seqIDs_by_pident.R") otus.custom.blast.table.modified ids.below.97 $pid FALSE
 
 # Step 4: 
-mkdir plots)
+mkdir plots
 Rscript $(echo "$script_location/plot_blast_hit_stats.R") otus.custom.blast.table.modified $pid plots
 
 # Step 5: recover sequence IDs left out of blast (python, bash)
