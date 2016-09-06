@@ -1,4 +1,5 @@
 #!/bin/bash
+# USAGE: sh mothur2oligo.sh
 # This is a shell script for applying the TaxAss pipeline by: https://github.com/McMahonLab/TaxAss
 
 ## Set variables
@@ -7,7 +8,7 @@
 ## fasta of samples to classify
 fasta="total.trim.contigs.good.unique.good.filter.unique.precluster.pick.fasta"
 ## Specific database (FWDB)
-fasta_ref ="/scratch/vdenef_fluxm/rprops/databases/FreshTrain18Aug2016.fasta"
+fasta_ref="/scratch/vdenef_fluxm/rprops/databases/FreshTrain18Aug2016.fasta"
 taxonomy_ref="/scratch/vdenef_fluxm/rprops/databases/FreshTrain18Aug2016.taxonomy"
 ## General database (SILVA)
 general_fasta="/scratch/vdenef_fluxm/rprops/databases/silva.nr_v123.align"
@@ -18,10 +19,10 @@ pid=97
 script_location="/scratch/vdenef_fluxm/rprops/scripts"
 
 # Remove '-' due to alignment (BLAST can't cope with this)
-sed 's/-//g' <$fasta >sequence.fasta)
+sed 's/-//g' <$(echo $fasta) >sequence.fasta
 
 # Step 0: Create blast database
-makeblastdb -dbtype nucl -in $fasta_ref -input_type fasta -parse_seqids -out FWonly_18Aug2016custom.db
+makeblastdb -dbtype nucl -in $(echo $fasta_ref) -input_type fasta -parse_seqids -out FWonly_18Aug2016custom.db
 
 # Step 1: Run blast and reformat output blast file
 blastn -query sequence.fasta -task megablast -db FWonly_18Aug2016custom.db -out custom.blast -outfmt 11 -max_target_seqs 5 -num_threads $processors
