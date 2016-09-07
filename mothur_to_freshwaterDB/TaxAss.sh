@@ -1,5 +1,5 @@
 #!/bin/bash
-# USAGE: sh mothur2oligo.sh
+# USAGE: bash -x TaxAss.sh
 # This is a shell script for applying the TaxAss pipeline by: https://github.com/McMahonLab/TaxAss
 
 ## Set variables
