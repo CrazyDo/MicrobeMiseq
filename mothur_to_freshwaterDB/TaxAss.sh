@@ -19,7 +19,7 @@ pid=97
 script_location="/scratch/vdenef_fluxm/rprops/scripts"
 
 # Remove '-' due to alignment (BLAST can't cope with this)
-sed 's/-//g' <$(echo $fasta) >sequence.fasta
+sed -e '/>/! s/-//g' <$(echo $fasta) >sequence.fasta
 
 # Step 0: Create blast database
 makeblastdb -dbtype nucl -in $(echo $fasta_ref) -input_type fasta -parse_seqids -out FWonly_18Aug2016custom.db
