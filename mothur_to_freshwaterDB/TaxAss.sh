@@ -54,5 +54,5 @@ python $(echo "$script_location/create_fastas_given_seqIDs.py") ids.below.97.all
 mothur "#classify.seqs(fasta=otus.below.97.fasta, template=$general_fasta, taxonomy=$general_tax, method=wang, probs=T, processors=$processors, cutoff=0)"
 mothur "#classify.seqs(fasta=otus.above.97.fasta, template=$fasta_ref,  taxonomy=$taxonomy_ref, method=wang, probs=T, processors=$processors, cutoff=80)"
 
-# Step 8: combine taxonomy files and names files
+# Step 8: combine taxonomy files
 cat otus.above.97.FreshTrain18Aug2016.wang.taxonomy otus.below.97.nr_v123.wang.taxonomy > final.FWDB.Silva.taxonomy
