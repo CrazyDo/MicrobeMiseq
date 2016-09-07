@@ -46,7 +46,7 @@ cat ids.below.97 ids.missing > ids.below.97.all
 
 # Step 6: create fasta files of desired sequence IDs (python)
 python $(echo "$script_location/create_fastas_given_seqIDs.py") ids.above.97 sequence.fasta otus.above.97.fasta
-python $(echo "$script_location/Taxonomy/create_fastas_given_seqIDs.py") ids.below.97.all sequence.fasta otus.below.97.fasta
+python $(echo "$script_location/create_fastas_given_seqIDs.py") ids.below.97.all sequence.fasta otus.below.97.fasta
 
 # Step 7: Screen for minimum length and max number of amibguous bases
 # Assign taxonomy to each fasta file
