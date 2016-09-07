@@ -7,7 +7,7 @@
 
 ## fasta of samples to classify
 fasta="total.trim.contigs.good.unique.good.filter.unique.precluster.pick.fasta"
-## Specific database (FWDB)
+## Specific database (FWDB - https://github.com/McMahonLab/TaxAss/tree/master/FreshTrain-files)
 fasta_ref="/scratch/vdenef_fluxm/rprops/databases/FreshTrain18Aug2016.fasta"
 taxonomy_ref="/scratch/vdenef_fluxm/rprops/databases/FreshTrain18Aug2016.taxonomy"
 ## General database (SILVA)
