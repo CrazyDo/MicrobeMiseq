@@ -48,8 +48,7 @@ cat ids.below.97 ids.missing > ids.below.97.all
 python $(echo "$script_location/create_fastas_given_seqIDs.py") ids.above.97 sequence.fasta otus.above.97.fasta
 python $(echo "$script_location/create_fastas_given_seqIDs.py") ids.below.97.all sequence.fasta otus.below.97.fasta
 
-# Step 7: Screen for minimum length and max number of amibguous bases
-# Assign taxonomy to each fasta file
+# Step 7: Assign taxonomy to each fasta file
 ### Classify
 mothur "#classify.seqs(fasta=otus.below.97.fasta, template=$general_fasta, taxonomy=$general_tax, method=wang, probs=T, processors=$processors, cutoff=80)"
 mothur "#classify.seqs(fasta=otus.above.97.fasta, template=$fasta_ref,  taxonomy=$taxonomy_ref, method=wang, probs=T, processors=$processors, cutoff=0)"
